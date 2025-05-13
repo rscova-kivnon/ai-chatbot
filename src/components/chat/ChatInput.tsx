@@ -12,7 +12,7 @@ interface ChatInputProps {
 const ChatInput = ({
   onSendMessage = () => {},
   isAiTyping = false,
-  placeholder = "Message ChatGPT...",
+  placeholder = "Message Nestor...",
 }: ChatInputProps) => {
   const [message, setMessage] = useState("");
   const [isFocused, setIsFocused] = useState(false);
@@ -61,10 +61,10 @@ const ChatInput = ({
           </Button>
         </form>
 
-        {isAiTyping && (
+        {/* {isAiTyping && (
           <div className="absolute -top-8 left-0 text-sm text-muted-foreground flex items-center">
             <div className="flex space-x-1 items-center">
-              <span>ChatGPT is typing</span>
+              <span>Nestor is typing</span>
               <span className="flex space-x-1">
                 <span className="animate-bounce delay-0 h-1 w-1 rounded-full bg-muted-foreground"></span>
                 <span className="animate-bounce delay-150 h-1 w-1 rounded-full bg-muted-foreground"></span>
@@ -72,10 +72,10 @@ const ChatInput = ({
               </span>
             </div>
           </div>
-        )}
+        )} */}
 
         <div className="text-xs text-muted-foreground mt-2 text-center">
-          ChatGPT can make mistakes. Consider checking important information.
+          Nestor can make mistakes. Consider checking important information.
         </div>
       </div>
     </div>

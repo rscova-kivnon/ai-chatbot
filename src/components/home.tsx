@@ -10,87 +10,119 @@ interface Message {
   sender: "user" | "ai";
   timestamp: Date;
   suggestions?: string[];
+  tokensConsumed?: number; // New field for tokens
+  maxModelTokens?: number; // New field for max tokens
+}
+
+// Define the expected structure of the backend response
+interface BackendChatResponse {
+    reply: string;
+    suggestions?: string[];
+    tokens_consumed?: number; // New field for tokens
+    max_model_tokens?: number; // New field for max tokens
 }
 
 const Home = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "1",
-      content: "Hello! How can I assist you today?",
+      content: "Hola, soy Nestor. ¿Cómo te encuentras hoy?",
       sender: "ai",
       timestamp: new Date(),
       suggestions: [
-        "Tell me about your features",
-        "How does this work?",
-        "Can you help me with a task?",
+        "Me gustaría hablar un poco.",
+        "¿Qué tal el día?",
+        "Necesito un momento de calma.",
       ],
     },
   ]);
   const [inputValue, setInputValue] = useState("");
   const [isAiTyping, setIsAiTyping] = useState(false);
+  const [error, setError] = useState<string | null>(null); // State for handling errors
+  const messagesEndRef = useRef<HTMLDivElement>(null); // Ref for the element to scroll to
+  const chatContainerRef = useRef<HTMLDivElement>(null); // Ref for the scrollable chat area
+
+  // Scroll to bottom whenever messages change or AI stops typing
+  useEffect(() => {
+    // Using setTimeout with 0ms delay defers the execution until after the current
+    // browser call stack has cleared and DOM updates have been processed.
+    // This helps ensure that the scroll happens after the new message's height is calculated.
+    const timerId = setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: "auto", block: "end" });
+    }, 0);
+
+    // Cleanup function to clear the timeout if dependencies change before it executes
+    return () => clearTimeout(timerId);
+  }, [messages, isAiTyping]); // Re-run when messages update or AI typing state changes
 
   // Function to handle sending a new message
-  const handleSendMessage = (content: string) => {
-    if (!content.trim()) return;
+  const handleSendMessage = async (content: string) => {
+    if (!content.trim() || isAiTyping) return;
 
-    // Add user message
+    setError(null); // Clear previous errors
     const userMessage: Message = {
-      id: Date.now().toString(),
+      id: `user-${Date.now()}`, // Ensure unique ID
       content,
       sender: "user",
       timestamp: new Date(),
     };
 
     setMessages((prev) => [...prev, userMessage]);
-    setInputValue("");
+    setInputValue(""); // Clear input field
     setIsAiTyping(true);
 
-    // Simulate AI response after a delay
-    setTimeout(() => {
-      const aiResponses = [
-        {
-          content:
-            "I understand what you're asking about. Let me provide some information on that topic.",
-          suggestions: [
-            "Tell me more",
-            "Can you give examples?",
-            "How is this implemented?",
-          ],
+    try {
+      // Call the backend API
+      const response = await fetch("http://localhost:8000/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
-        {
-          content:
-            "That's an interesting question. Here's what I know about it.",
-          suggestions: [
-            "What are the benefits?",
-            "Are there any alternatives?",
-            "How can I learn more?",
-          ],
-        },
-        {
-          content:
-            "I'd be happy to help with that. Here are some steps you might consider.",
-          suggestions: [
-            "What's the first step?",
-            "Is there documentation?",
-            "Can you show me a demo?",
-          ],
-        },
-      ];
+        body: JSON.stringify({ message: content }),
+      });
 
-      const randomResponse =
-        aiResponses[Math.floor(Math.random() * aiResponses.length)];
+      if (!response.ok) {
+        // Handle HTTP errors
+        const errorData = await response.json().catch(() => ({ detail: "Failed to parse error response from backend" }));
+        throw new Error(`Network response was not ok: ${response.statusText} - ${errorData?.detail || ''}`);
+      }
 
+      const data: BackendChatResponse = await response.json();
+
+      // Add AI response from backend
       const aiMessage: Message = {
-        id: Date.now().toString(),
-        content: randomResponse.content,
+        id: `ai-${Date.now()}`, // Ensure unique ID
+        content: data.reply,
         sender: "ai",
         timestamp: new Date(),
-        suggestions: randomResponse.suggestions,
+        suggestions: undefined, // Ensure no suggestions for subsequent AI messages
+        tokensConsumed: data.tokens_consumed, // Populate tokens
+        maxModelTokens: data.max_model_tokens, // Populate max tokens
       };
-
       setMessages((prev) => [...prev, aiMessage]);
-      setIsAiTyping(false);
-    }, 1500);
+
+    } catch (err) {
+      console.error("Error sending message to backend:", err);
+      let errorMessageText = "Failed to get response from AI. Please try again.";
+      if (err instanceof Error) {
+          errorMessageText = `Error: ${err.message}`;
+      }
+      setError(errorMessageText); // Set error state to display to user
+
+      // Optionally add an error message to the chat interface
+      const errorChatMessage: Message = {
+          id: `error-${Date.now()}`,
+          content: errorMessageText,
+          sender: "ai", // Or a dedicated 'system' sender type
+          timestamp: new Date(),
+          suggestions: undefined, // Explicitly no suggestions for error messages either
+          // tokensConsumed and maxModelTokens will be undefined for error messages
+      };
+      setMessages((prev) => [...prev, errorChatMessage]);
+
+    } finally {
+      setIsAiTyping(false); // Stop typing indicator regardless of success/failure
+    }
   };
 
   // Handle suggestion click
@@ -119,8 +151,20 @@ const Home = () => {
       </motion.header>
 
       {/* Main chat area */}
-      <div className="flex-1 overflow-y-auto">
+      <div ref={chatContainerRef} className="flex-1 overflow-y-auto"> {/* Added ref to the scrollable container */}
         <div className="max-w-4xl mx-auto p-4 space-y-4">
+          {/* Display Error Message if any */}
+          {error && (
+              <motion.div
+                  className="p-3 mb-4 text-sm text-red-700 bg-red-100 rounded-lg dark:bg-red-200 dark:text-red-800"
+                  role="alert"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+              >
+                  <span className="font-medium">Error:</span> {error}
+              </motion.div>
+          )}
+
           {messages.map((message) => (
             <motion.div
               key={message.id}
@@ -135,8 +179,10 @@ const Home = () => {
                   hour: "2-digit",
                   minute: "2-digit",
                 })}
-                suggestions={message.suggestions}
+                suggestions={message.suggestions} // Will be undefined for non-initial AI messages
                 onSuggestionClick={handleSuggestionClick}
+                tokensConsumed={message.tokensConsumed} // Pass tokens
+                maxModelTokens={message.maxModelTokens} // Pass max tokens
               />
             </motion.div>
           ))}
@@ -160,9 +206,11 @@ const Home = () => {
                   style={{ animationDelay: "300ms" }}
                 />
               </div>
-              <span>AI is typing</span>
+              <span>Nestor is typing</span>
             </motion.div>
           )}
+          {/* This div is the target for scrollIntoView. Giving it a minimal height can sometimes help. */}
+          <div ref={messagesEndRef} style={{ height: "1px" }} />
         </div>
       </div>
 
@@ -190,7 +238,7 @@ const Home = () => {
       <div className="border-t border-gray-100 bg-white p-4">
         <div className="max-w-3xl mx-auto">
           <ChatInput
-            onSendMessage={handleSendMessage}
+            onSendMessage={handleSendMessage} // Pass the async handleSendMessage
             isAiTyping={isAiTyping}
           />
         </div>

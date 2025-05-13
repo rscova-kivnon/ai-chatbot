@@ -7,6 +7,8 @@ interface MessageBubbleProps {
   timestamp?: string;
   suggestions?: string[];
   onSuggestionClick?: (suggestion: string) => void;
+  tokensConsumed?: number;
+  maxModelTokens?: number; // New prop
 }
 
 const MessageBubble = ({
@@ -18,6 +20,8 @@ const MessageBubble = ({
   }),
   suggestions = [],
   onSuggestionClick = () => {},
+  tokensConsumed,
+  maxModelTokens, // Destructure new prop
 }: MessageBubbleProps) => {
   const [displayedText, setDisplayedText] = useState("");
   const [isTyping, setIsTyping] = useState(isAi);
@@ -82,8 +86,17 @@ const MessageBubble = ({
           </div>
         )}
 
-        <div className="text-[10px] opacity-70 mt-1 text-right">
-          {timestamp}
+        <div className="flex justify-between items-center mt-1">
+          {isAi && tokensConsumed !== undefined && (
+            <div className="text-[10px] opacity-70 text-left">
+              Tokens: {tokensConsumed}
+              {maxModelTokens !== undefined ? `/${maxModelTokens}` : ""}
+            </div>
+          )}
+          {!isAi && <div className="flex-grow"></div>} {/* Spacer for user messages */}
+          <div className={`text-[10px] opacity-70 ${isAi && tokensConsumed !== undefined ? "text-right" : "w-full text-right"}`}>
+            {timestamp}
+          </div>
         </div>
       </div>
     </motion.div>

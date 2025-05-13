@@ -128,7 +128,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({
                 style={{ animationDelay: "300ms" }}
               />
             </div>
-            <span>AI is typing</span>
+            <span>Nestor is typing</span>
           </motion.div>
         )}
 
