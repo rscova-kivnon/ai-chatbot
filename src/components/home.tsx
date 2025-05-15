@@ -72,8 +72,8 @@ const Home = () => {
     setIsAiTyping(true);
 
     try {
-      // Call the backend API
-      const response = await fetch("http://localhost:8000/api/chat", {
+      // Call the backend streaming API
+      const response = await fetch("http://localhost:8000/api/chat/stream", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -87,39 +87,69 @@ const Home = () => {
         throw new Error(`Network response was not ok: ${response.statusText} - ${errorData?.detail || ''}`);
       }
 
-      const data: BackendChatResponse = await response.json();
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder("utf-8");
+      let done = false;
 
-      // Add AI response from backend
-      const aiMessage: Message = {
-        id: `ai-${Date.now()}`, // Ensure unique ID
-        content: data.reply,
-        sender: "ai",
-        timestamp: new Date(),
-        suggestions: undefined, // Ensure no suggestions for subsequent AI messages
-        tokensConsumed: data.tokens_consumed, // Populate tokens
-        maxModelTokens: data.max_model_tokens, // Populate max tokens
-      };
-      setMessages((prev) => [...prev, aiMessage]);
+      // Crear el mensaje inicial del AI
+      setMessages((prev) => {
+        const lastMessage = prev[prev.length - 1];
+        if (lastMessage?.sender === "ai") {
+          return prev;
+        }
+        return [
+          ...prev,
+          {
+            id: `ai-${Date.now()}`,
+            content: "",
+            sender: "ai",
+            timestamp: new Date(),
+          },
+        ];
+      });
 
+      while (!done) {
+        const { value, done: readerDone } = await reader?.read()!;
+        done = readerDone;
+
+        if (value) {
+          const chunk = decoder.decode(value, { stream: true });
+
+          // Update the last AI message bubble in real-time
+          setMessages((prev) => {
+            const lastMessage = prev[prev.length - 1];
+
+            if (lastMessage?.sender === "ai") {
+              // Update the content of the last AI message
+              return [
+                ...prev.slice(0, -1),
+                {
+                  ...lastMessage,
+                  content: lastMessage.content + chunk,
+                },
+              ];
+            }
+            return prev;
+          });
+        }
+      }
     } catch (err) {
       console.error("Error sending message to backend:", err);
       let errorMessageText = "Failed to get response from AI. Please try again.";
       if (err instanceof Error) {
-          errorMessageText = `Error: ${err.message}`;
+        errorMessageText = `Error: ${err.message}`;
       }
       setError(errorMessageText); // Set error state to display to user
 
       // Optionally add an error message to the chat interface
       const errorChatMessage: Message = {
-          id: `error-${Date.now()}`,
-          content: errorMessageText,
-          sender: "ai", // Or a dedicated 'system' sender type
-          timestamp: new Date(),
-          suggestions: undefined, // Explicitly no suggestions for error messages either
-          // tokensConsumed and maxModelTokens will be undefined for error messages
+        id: `error-${Date.now()}`,
+        content: errorMessageText,
+        sender: "ai", // Or a dedicated 'system' sender type
+        timestamp: new Date(),
+        suggestions: undefined, // Explicitly no suggestions for error messages either
       };
       setMessages((prev) => [...prev, errorChatMessage]);
-
     } finally {
       setIsAiTyping(false); // Stop typing indicator regardless of success/failure
     }

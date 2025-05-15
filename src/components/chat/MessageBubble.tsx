@@ -23,30 +23,14 @@ const MessageBubble = ({
   tokensConsumed,
   maxModelTokens, // Destructure new prop
 }: MessageBubbleProps) => {
-  const [displayedText, setDisplayedText] = useState("");
-  const [isTyping, setIsTyping] = useState(isAi);
   const [showSuggestions, setShowSuggestions] = useState(false);
 
-  // Typing animation effect for AI messages
+  // Mostrar sugerencias solo cuando el mensaje está completo
   useEffect(() => {
-    if (isAi) {
-      let i = 0;
-      const typingInterval = setInterval(() => {
-        if (i < message.length) {
-          setDisplayedText(message.substring(0, i + 1));
-          i++;
-        } else {
-          clearInterval(typingInterval);
-          setIsTyping(false);
-          setShowSuggestions(true);
-        }
-      }, 15); // Speed of typing
-
-      return () => clearInterval(typingInterval);
-    } else {
-      setDisplayedText(message);
+    if (isAi && suggestions.length > 0) {
+      setShowSuggestions(true);
     }
-  }, [message, isAi]);
+  }, [isAi, suggestions.length]);
 
   return (
     <motion.div
@@ -62,16 +46,12 @@ const MessageBubble = ({
             : "bg-primary text-primary-foreground"
         }`}
       >
-        <div className="text-sm">
-          {isAi ? displayedText : message}
-          {isTyping && (
-            <span className="inline-block ml-1 animate-pulse">▋</span>
-          )}
+        <div className="text-sm whitespace-pre-wrap">
+          {message}
         </div>
 
         {showSuggestions && suggestions.length > 0 && (
           <div className="mt-2">
-            {/* We'll render suggestion chips here once the SuggestionChips component is available */}
             <div className="flex flex-wrap gap-2">
               {suggestions.map((suggestion, index) => (
                 <button
