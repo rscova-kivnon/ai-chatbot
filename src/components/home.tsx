@@ -42,18 +42,29 @@ const Home = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null); // Ref for the element to scroll to
   const chatContainerRef = useRef<HTMLDivElement>(null); // Ref for the scrollable chat area
 
-  // Scroll to bottom whenever messages change or AI stops typing
-  useEffect(() => {
-    // Using setTimeout with 0ms delay defers the execution until after the current
-    // browser call stack has cleared and DOM updates have been processed.
-    // This helps ensure that the scroll happens after the new message's height is calculated.
-    const timerId = setTimeout(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: "auto", block: "end" });
-    }, 0);
+  // Función mejorada para manejar el scroll
+  const scrollToBottom = () => {
+    if (chatContainerRef.current) {
+      const { scrollHeight, clientHeight, scrollTop } = chatContainerRef.current;
+      const isNearBottom = scrollHeight - (scrollTop + clientHeight) < 100;
+      
+      if (isNearBottom || isAiTyping) {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+      }
+    }
+  };
 
-    // Cleanup function to clear the timeout if dependencies change before it executes
-    return () => clearTimeout(timerId);
-  }, [messages, isAiTyping]); // Re-run when messages update or AI typing state changes
+  // Efecto para manejar el scroll automático
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, isAiTyping]);
+
+  // Efecto adicional para vigilar cambios en el contenido del último mensaje
+  useEffect(() => {
+    if (messages.length > 0 && messages[messages.length - 1].sender === "ai") {
+      scrollToBottom();
+    }
+  }, [messages[messages.length - 1]?.content]);
 
   // Function to handle sending a new message
   const handleSendMessage = async (content: string) => {
@@ -70,6 +81,7 @@ const Home = () => {
     setMessages((prev) => [...prev, userMessage]);
     setInputValue(""); // Clear input field
     setIsAiTyping(true);
+    scrollToBottom();
 
     try {
       // Call the backend streaming API
@@ -120,14 +132,16 @@ const Home = () => {
             const lastMessage = prev[prev.length - 1];
 
             if (lastMessage?.sender === "ai") {
-              // Update the content of the last AI message
-              return [
+              const updatedMessages = [
                 ...prev.slice(0, -1),
                 {
                   ...lastMessage,
                   content: lastMessage.content + chunk,
                 },
               ];
+              // Forzar scroll después de cada actualización
+              setTimeout(scrollToBottom, 0);
+              return updatedMessages;
             }
             return prev;
           });
@@ -152,6 +166,8 @@ const Home = () => {
       setMessages((prev) => [...prev, errorChatMessage]);
     } finally {
       setIsAiTyping(false); // Stop typing indicator regardless of success/failure
+      // Asegurar scroll al final cuando se complete el mensaje
+      setTimeout(scrollToBottom, 100);
     }
   };
 

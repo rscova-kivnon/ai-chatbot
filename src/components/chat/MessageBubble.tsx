@@ -24,13 +24,40 @@ const MessageBubble = ({
   maxModelTokens, // Destructure new prop
 }: MessageBubbleProps) => {
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [displayedText, setDisplayedText] = useState("");
+  const [isTyping, setIsTyping] = useState(false);
 
-  // Mostrar sugerencias solo cuando el mensaje está completo
   useEffect(() => {
-    if (isAi && suggestions.length > 0) {
+    if (!isAi) {
+      setDisplayedText(message);
+      return;
+    }
+
+    if (message !== displayedText) {
+      setIsTyping(true);
+      let currentIndex = displayedText.length;
+      
+      const typeNextCharacter = () => {
+        if (currentIndex < message.length) {
+          setDisplayedText(message.slice(0, currentIndex + 1));
+          currentIndex++;
+          const delay = Math.random() * 30 + 20; // Random delay between 20-50ms
+          setTimeout(typeNextCharacter, delay);
+        } else {
+          setIsTyping(false);
+        }
+      };
+
+      typeNextCharacter();
+    }
+  }, [message, isAi]);
+
+  // Mostrar sugerencias solo cuando el mensaje está completo y no está escribiendo
+  useEffect(() => {
+    if (isAi && suggestions.length > 0 && !isTyping) {
       setShowSuggestions(true);
     }
-  }, [isAi, suggestions.length]);
+  }, [isAi, suggestions.length, isTyping]);
 
   return (
     <motion.div
@@ -47,7 +74,8 @@ const MessageBubble = ({
         }`}
       >
         <div className="text-sm whitespace-pre-wrap">
-          {message}
+          {displayedText}
+          {isTyping && <span className="animate-pulse">▋</span>}
         </div>
 
         {showSuggestions && suggestions.length > 0 && (
